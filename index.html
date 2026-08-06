@@ -11,6 +11,9 @@
     .wine-card{background:#f2e9dc !important}
     .wine-card .bottle-box{background:#ffffff !important}
     .wine-card .wine-copy{background:#f2e9dc !important;background-image:none !important}
+    .modal-grid .modal-image{background:#ffffff !important}
+    .modal-grid .modal-copy{background:#f2e9dc !important}
+    .modal-grid .price-box{background:#ffffff !important}
   </style>
 </head>
 <body>
@@ -54,6 +57,11 @@
       const wrap=document.querySelector('#modalWrap');wrap.classList.add('open');document.querySelector('.close').onclick=closeModal;
     }
     function renderWiki(){const grouped={};wiki.forEach(item=>(grouped[item.category]??=[]).push(item));const order=['分級','名詞','產區','葡萄品種'];const categories=[...order,...Object.keys(grouped).filter(c=>!order.includes(c))].filter(c=>grouped[c]);document.querySelector('#wikiGroups').innerHTML=categories.map(category=>'<article class="wiki-group"><h3>'+esc(category)+'</h3>'+grouped[category].map(item=>'<button class="wiki-entry" data-category="'+esc(category)+'" data-title="'+esc(item.title)+'">'+esc(item.title)+' →</button>').join('')+'</article>').join('');document.querySelectorAll('.wiki-entry').forEach(b=>b.onclick=()=>openWiki(b.dataset.category,b.dataset.title))}
+    const formatPrice=value=>{const text=String(value??'').trim();return !text||text.includes('$')?text:'$'+text};
+    const refreshVisiblePrices=()=>{document.querySelectorAll('.wine-card .tag').forEach(tag=>{const text=tag.textContent.trim();if(/^[d,]+(?:[–-][d,]+)?$/.test(text))tag.textContent=formatPrice(text)});document.querySelectorAll('.price').forEach(price=>price.textContent=formatPrice(price.textContent));document.querySelectorAll('.comparison-row').forEach(row=>{if(row.querySelector('b')?.textContent.trim()==='價格')row.querySelectorAll('span').forEach(cell=>cell.textContent=formatPrice(cell.textContent))})};
+    const originalOpenWine=openWine;openWine=id=>{originalOpenWine(id);refreshVisiblePrices();const selector=document.querySelector('#vintageSelect');if(selector)selector.addEventListener('change',()=>{const price=document.querySelector('#selectedPrice');if(price)price.textContent=formatPrice(price.textContent)})};
+    const originalRenderWines=renderWines;renderWines=()=>{originalRenderWines();refreshVisiblePrices()};
+    const originalRenderCompare=renderCompare;renderCompare=()=>{originalRenderCompare();refreshVisiblePrices()};
     grid.addEventListener('click',e=>{if(e.target.closest('.detail-btn'))return;const card=e.target.closest('.wine-card');const id=card?.querySelector('[data-id]')?.dataset.id;if(id)openWine(id)});
     document.querySelector('#openCellar').onclick=openCellar;document.querySelector('#openSommelier').onclick=openSommelier;
     renderFilters();renderWines();setupCompare();renderWiki();
