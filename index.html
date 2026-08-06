@@ -14,10 +14,12 @@
     .modal-grid .modal-image{background:#ffffff !important}
     .modal-grid .modal-copy{background:#f2e9dc !important}
     .modal-grid .price-box{background:#ffffff !important}
+    .menu-toggle{display:none;border:1px solid var(--wine);background:var(--wine);color:#fff;border-radius:999px;padding:7px 13px;font-size:12px}
+    @media(max-width:720px){.nav{height:68px;padding:0 20px;position:sticky}.brand{font-size:15px}.brand small{font-size:8px}.menu-toggle{display:block;margin-left:auto}.nav-links{display:none;position:absolute;top:67px;left:0;right:0;margin:0;padding:12px 20px 18px;background:rgba(255,253,250,.98);border-bottom:1px solid var(--line);box-shadow:0 12px 18px rgba(54,30,25,.1);flex-direction:column;align-items:stretch;gap:0}.nav-links.open{display:flex}.nav-links a,.nav-links .nav-action{padding:12px 2px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}.nav-links .nav-action:last-child{border-bottom:0}}
   </style>
 </head>
 <body>
-  <nav class="nav"><a class="brand" href="#top">WINNWAY STUDIO<small>THE ART OF DISCOVERY</small></a><div class="nav-links"><a href="#wines">酒款收藏</a><a href="#compare">酒款比較</a><a href="#wiki">紅酒百科</a><button class="nav-action" id="openSommelier">問侍酒師</button><button class="nav-action" id="openCellar">我的酒窖</button></div></nav>
+  <nav class="nav"><a class="brand" href="#top">WINNWAY STUDIO<small>THE ART OF DISCOVERY</small></a><button class="menu-toggle" id="menuToggle" aria-expanded="false" aria-controls="navLinks">選單</button><div class="nav-links" id="navLinks"><a href="#wines">酒款收藏</a><a href="#compare">酒款比較</a><a href="#wiki">紅酒百科</a><button class="nav-action" id="openSommelier">問侍酒師</button><button class="nav-action" id="openCellar">我的酒窖</button></div></nav>
   <main id="top"><header class="hero"><div><div class="eyebrow">Wine, made clear</div><h1>從第一口開始，<em>讀懂</em><br>一支酒。</h1><p>以產區、品種與風味，帶你找到每一支酒的故事。</p><form class="search" id="searchForm"><input id="searchInput" aria-label="搜尋酒款" placeholder="搜尋酒名、酒莊、產區或葡萄品種"><button>搜尋</button></form></div></header>
   <section id="wines"><div class="section-head"><div><div class="eyebrow">Curated selection</div><h2>酒款收藏</h2></div><p>每支酒都可以展開閱讀香氣、搭餐與年份價格。未提供年份資料的酒款，直接顯示參考價格。</p></div><div class="filters" id="filters"></div><div class="wine-grid" id="wineGrid"></div></section>
   <section class="compare" id="compare"><div class="section-head"><div><div class="eyebrow">Side by side</div><h2>酒款比較</h2></div><p>選擇兩支酒，快速比較產區、品種、價格與風味。</p></div><div class="compare-grid"><select id="compareA"></select><select id="compareB"></select></div><div class="comparison" id="comparison"></div></section>
@@ -63,6 +65,9 @@
     const originalRenderWines=renderWines;renderWines=()=>{originalRenderWines();refreshVisiblePrices()};
     const originalRenderCompare=renderCompare;renderCompare=()=>{originalRenderCompare();refreshVisiblePrices()};
     grid.addEventListener('click',e=>{if(e.target.closest('.detail-btn'))return;const card=e.target.closest('.wine-card');const id=card?.querySelector('[data-id]')?.dataset.id;if(id)openWine(id)});
+    const menuToggle=document.querySelector('#menuToggle');const navLinks=document.querySelector('#navLinks');
+    menuToggle.onclick=()=>{const isOpen=navLinks.classList.toggle('open');menuToggle.setAttribute('aria-expanded',String(isOpen));menuToggle.textContent=isOpen?'收起':'選單'};
+    navLinks.querySelectorAll('a,button').forEach(item=>item.addEventListener('click',()=>{navLinks.classList.remove('open');menuToggle.setAttribute('aria-expanded','false');menuToggle.textContent='選單'}));
     document.querySelector('#openCellar').onclick=openCellar;document.querySelector('#openSommelier').onclick=openSommelier;
     renderFilters();renderWines();setupCompare();renderWiki();
   </script>
