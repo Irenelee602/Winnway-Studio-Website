@@ -44,7 +44,7 @@
       const body=title==='波爾多左岸與右岸'?bordeauxText:title==='布根地分級制度'?burgundyText:item.body;
       const bodyHtml=title==='單寧'?tanninHtml:title==='波爾多左岸與右岸'||title==='布根地分級制度'?body:esc(body);
       let extra='';
-      if(title==='波爾多左岸與右岸')extra='<div class="bordeaux-images"><h3>兩岸差異示意</h3><img src="bordeaux-left-right-map.png" alt="波爾多左岸與右岸地圖"></div>'+bordeauxTable;
+      if(title==='波爾多左岸與右岸')extra='<div class="bordeaux-images"><h3>兩岸差異示意</h3><img src="bordeaux-left-right-map.png" alt="波爾多左岸與右岸地圖" style="width:80%;display:block;margin:0 auto"></div>'+bordeauxTable;
       if(title==='布根地分級制度')extra='<div class="bordeaux-images"><h3>布根地分級金字塔</h3><img src="burgundy-classification-pyramid.png" alt="布根地分級金字塔"></div>';
       document.querySelector('#modal').innerHTML='<button class="close" aria-label="關閉">×</button><article class="card-page"><div class="eyebrow">'+esc(category)+'</div><h2>'+esc(item.title)+'</h2><div class="body">'+bodyHtml+'</div>'+extra+'</article>';
       const wrap=document.querySelector('#modalWrap');wrap.classList.add('open');document.querySelector('.close').onclick=closeModal;
