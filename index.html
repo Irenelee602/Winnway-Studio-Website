@@ -50,6 +50,7 @@
       const wrap=document.querySelector('#modalWrap');wrap.classList.add('open');document.querySelector('.close').onclick=closeModal;
     }
     function renderWiki(){const grouped={};wiki.forEach(item=>(grouped[item.category]??=[]).push(item));const order=['分級','名詞','產區','葡萄品種'];const categories=[...order,...Object.keys(grouped).filter(c=>!order.includes(c))].filter(c=>grouped[c]);document.querySelector('#wikiGroups').innerHTML=categories.map(category=>'<article class="wiki-group"><h3>'+esc(category)+'</h3>'+grouped[category].map(item=>'<button class="wiki-entry" data-category="'+esc(category)+'" data-title="'+esc(item.title)+'">'+esc(item.title)+' →</button>').join('')+'</article>').join('');document.querySelectorAll('.wiki-entry').forEach(b=>b.onclick=()=>openWiki(b.dataset.category,b.dataset.title))}
+    grid.addEventListener('click',e=>{if(e.target.closest('.detail-btn'))return;const card=e.target.closest('.wine-card');const id=card?.querySelector('[data-id]')?.dataset.id;if(id)openWine(id)});
     document.querySelector('#openCellar').onclick=openCellar;document.querySelector('#openSommelier').onclick=openSommelier;
     renderFilters();renderWines();setupCompare();renderWiki();
   </script>
