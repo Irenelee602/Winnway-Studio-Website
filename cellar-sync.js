@@ -60,3 +60,17 @@
   };
   document.querySelector("#openCellar").onclick = window.openCellar;
 })();
+
+// Add a clear, visible sign-out control to both the desktop navigation and mobile menu.
+(() => {
+  const nav = document.querySelector("#navLinks");
+  if (!nav || document.querySelector("#logoutButton")) return;
+
+  const button = document.createElement("button");
+  button.id = "logoutButton";
+  button.type = "button";
+  button.className = "nav-action";
+  button.textContent = "登出";
+  button.addEventListener("click", () => window.location.assign("/api/logout"));
+  nav.append(button);
+})();
