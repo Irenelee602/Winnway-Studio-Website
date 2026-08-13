@@ -187,5 +187,18 @@
     };
     renderFilters();renderWines();
   </script>
+  <script>
+    /* 細分類與酒精濃度為選填：僅在有資料時顯示於酒款詳細頁。 */
+    const originalOpenWineWithLiquorDetails=openWine;
+    openWine=id=>{
+      originalOpenWineWithLiquorDetails(id);
+      const wine=wines.find(item=>item.id===id);
+      if(!wine)return;
+      const details=[];
+      if(wine.spiritCategory)details.push('<div class="info"><h4>酒類細分類</h4><p>'+esc(wine.spiritCategory)+'</p></div>');
+      if(wine.alcoholContent)details.push('<div class="info"><h4>酒精濃度</h4><p>'+esc(wine.alcoholContent)+'</p></div>');
+      if(details.length){const anchor=document.querySelector('#modal .price-box');if(anchor)anchor.insertAdjacentHTML('afterend',details.join(''));}
+    };
+  </script>
 </body>
 </html>
