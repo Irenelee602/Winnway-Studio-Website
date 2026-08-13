@@ -155,24 +155,21 @@ export default {
     const signedIn = await hasSession(request, env);
     if (url.pathname === "/admin") {
       if (!signedIn) return Response.redirect(`${url.origin}/login`, 302);
-      if (!env.ADMIN_PASSWORD) return html(adminLoginPage("尚未設定管理後台密碼。"), 503);
-      if (!await hasAdminSession(request, env)) return html(adminLoginPage());
       return env.ASSETS.fetch(new Request(new URL("/admin.html", request.url), request));
     }
-    if (url.pathname === "/api/admin/login" && request.method === "POST") {
+    if (url.pathname === "/api/admin/verify" && request.method === "POST") {
       if (!signedIn) return json({ error: "請先登入網站。" }, 401);
-      const form = await request.formData();
+      const form = await requestBody(request);
       if (!env.ADMIN_PASSWORD) return json({ error: "尚未設定管理後台密碼。" }, 503);
-      if (String(form.get("password") || "") !== env.ADMIN_PASSWORD) return json({ error: "管理密碼不正確。" }, 401);
-      const cookie = await newAdminSession(env);
-      return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json; charset=UTF-8", "cache-control": "no-store", "set-cookie": `winnway_admin=${cookie}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200` } });
+      if (String(form.password || "") !== env.ADMIN_PASSWORD) return json({ error: "管理密碼不正確。" }, 401);
+      return json({ ok: true });
     }
     if (!signedIn) return Response.redirect(`${url.origin}/login`, 302);
     try {
       if (url.pathname === "/winnway-content.json") return json(await managedContent(request, env));
       if (url.pathname.startsWith("/api/cellar")) return cellarApi(request, env, url.pathname);
       if (url.pathname.startsWith("/api/content")) {
-        if (!await hasAdminSession(request, env)) return json({ error: "請先通過後台密碼驗證。" }, 403);
+        if (!env.ADMIN_PASSWORD || request.headers.get("x-winnway-admin") !== env.ADMIN_PASSWORD) return json({ error: "請先通過後台密碼驗證。" }, 403);
         return contentApi(request, env, url.pathname);
       }
       return env.ASSETS.fetch(request);
