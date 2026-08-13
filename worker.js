@@ -24,7 +24,7 @@ async function hmac(value, secret) {
 }
 
 async function hasSession(request, env) {
-  const token = (request.headers.get("cookie") || "").match(/(?:^|; )winnway_session=([^;]+)/)?.[1];
+  const token = (request.headers.get("cookie") || "").match(/(?:^|; )winnway_session_v2=([^;]+)/)?.[1];
   if (!token || !env.SESSION_SECRET) return false;
   const [payload, signature] = token.split(".");
   if (!payload || !signature || signature !== await hmac(payload, env.SESSION_SECRET)) return false;
@@ -148,9 +148,9 @@ export default {
       if (!env.SITE_PASSWORD || !env.SESSION_SECRET) return html(loginPage("<p class=error>網站尚未完成密碼設定。</p>"), 503);
       if (String(form.get("password") || "") !== env.SITE_PASSWORD) return html(loginPage("<p class=error>密碼不正確，請再試一次。</p>"), 401);
       const cookie = await newSession(env);
-      return new Response(null, { status: 302, headers: { location: "/", "set-cookie": `winnway_session=${cookie}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=2592000` } });
+      return new Response(null, { status: 302, headers: [["location", "/"], ["set-cookie", `winnway_session_v2=${cookie}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`], ["set-cookie", "winnway_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"]] });
     }
-    if (url.pathname === "/api/logout") return new Response(null, { status: 302, headers: [["location", "/login"], ["set-cookie", "winnway_session=; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=0"], ["set-cookie", "winnway_admin=; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=0"]] });
+    if (url.pathname === "/api/logout") return new Response(null, { status: 302, headers: [["location", "/login"], ["set-cookie", "winnway_session_v2=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"], ["set-cookie", "winnway_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"], ["set-cookie", "winnway_admin=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"]] });
 
     const signedIn = await hasSession(request, env);
     if (url.pathname === "/admin") {
