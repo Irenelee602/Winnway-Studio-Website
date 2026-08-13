@@ -153,17 +153,25 @@ export default {
     if (url.pathname === "/api/logout") return new Response(null, { status: 302, headers: [["location", "/login"], ["set-cookie", "winnway_session=; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=0"], ["set-cookie", "winnway_admin=; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=0"]] });
 
     const signedIn = await hasSession(request, env);
-    if (!signedIn) return Response.redirect(`${url.origin}/login`, 302);
-    if (url.pathname === "/admin/login") {
-      if (await hasAdminSession(request, env)) return Response.redirect(`${url.origin}/admin`, 302);
-      return html(adminLoginPage());
+    if (url.pathname === "/admin") {
+      if (!signedIn) return Response.redirect(`${url.origin}/login`, 302);
+      if (!await hasAdminSession(request, env)) return html(adminLoginPage());
+      return env.ASSETS.fetch(new Request(new URL("/admin.html", request.url), request));
     }
     if (url.pathname === "/api/admin/login" && request.method === "POST") {
+      if (!signedIn) return Response.redirect(`${url.origin}/login`, 302);
       const form = await request.formData();
       if (!env.ADMIN_PASSWORD) return html(adminLoginPage("<p class=error>尚未設定管理後台密碼。</p>"), 503);
       if (String(form.get("password") || "") !== env.ADMIN_PASSWORD) return html(adminLoginPage("<p class=error>管理密碼不正確。</p>"), 401);
       const cookie = await newAdminSession(env);
-      return new Response(null, { status: 302, headers: { location: "/admin", "set-cookie": `winnway_admin=${cookie}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=43200` } });
+      const adminAsset = await env.ASSETS.fetch(new Request(new URL("/admin.html", request.url), request));
+      const page = (await adminAsset.text()).replace("</body>", "<script>history.replaceState(null, '', '/admin');</script></body>");
+      return html(page, 200, { "set-cookie": `winnway_admin=${cookie}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=43200` });
+    }
+    if (!signedIn) return Response.redirect(`${url.origin}/login`, 302);
+    if (url.pathname === "/admin/login") {
+      if (await hasAdminSession(request, env)) return Response.redirect(`${url.origin}/admin`, 302);
+      return html(adminLoginPage());
     }
     try {
       if (url.pathname === "/winnway-content.json") return json(await managedContent(request, env));
@@ -171,10 +179,6 @@ export default {
       if (url.pathname.startsWith("/api/content")) {
         if (!await hasAdminSession(request, env)) return json({ error: "請先完成管理後台驗證。" }, 403);
         return contentApi(request, env, url.pathname);
-      }
-      if (url.pathname === "/admin") {
-        if (!await hasAdminSession(request, env)) return Response.redirect(`${url.origin}/admin/login`, 302);
-        return env.ASSETS.fetch(new Request(new URL("/admin.html", request.url), request));
       }
       return env.ASSETS.fetch(request);
     } catch (error) { return json({ error: `系統暫時無法處理：${error.message}` }, 500); }
