@@ -155,7 +155,6 @@ export default {
     const signedIn = await hasSession(request, env);
     if (url.pathname === "/admin") {
       if (!signedIn) return Response.redirect(`${url.origin}/login`, 302);
-      if (!await hasAdminSession(request, env)) return html(adminLoginPage());
       return env.ASSETS.fetch(new Request(new URL("/admin.html", request.url), request));
     }
     if (url.pathname === "/api/admin/login" && request.method === "POST") {
@@ -176,10 +175,7 @@ export default {
     try {
       if (url.pathname === "/winnway-content.json") return json(await managedContent(request, env));
       if (url.pathname.startsWith("/api/cellar")) return cellarApi(request, env, url.pathname);
-      if (url.pathname.startsWith("/api/content")) {
-        if (!await hasAdminSession(request, env)) return json({ error: "請先完成管理後台驗證。" }, 403);
-        return contentApi(request, env, url.pathname);
-      }
+      if (url.pathname.startsWith("/api/content")) return contentApi(request, env, url.pathname);
       return env.ASSETS.fetch(request);
     } catch (error) { return json({ error: `系統暫時無法處理：${error.message}` }, 500); }
   },
