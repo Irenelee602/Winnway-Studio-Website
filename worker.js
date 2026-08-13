@@ -58,7 +58,7 @@ function loginPage(message = "") {
 }
 
 function adminLoginPage(message = "") {
-  return `<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Winnway Studio｜管理驗證</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f2e9dc;color:#251619;font:16px system-ui,"Microsoft JhengHei",sans-serif}.box{width:min(400px,88vw);background:#fffdfa;padding:38px;box-shadow:0 20px 60px #4b2b2730}.brand{font:700 25px Georgia,serif;letter-spacing:.1em}.brand small{display:block;color:#766963;font:11px Georgia,serif;letter-spacing:.18em;margin-top:6px}.field-label{display:block;margin:30px 0 8px}input,button{box-sizing:border-box;width:100%;padding:13px;font:inherit}input{border:1px solid #d8caba}.show{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:#685b54}.show input{width:auto;padding:0}button{margin-top:14px;border:0;background:#7c2d38;color:#fff}.error{color:#8b2f3a;font-size:13px}</style><main class="box"><div class="brand">WINNWAY STUDIO<small>CONTENT ADMIN</small></div><label class="field-label">管理後台密碼</label><form method="post" action="/api/admin/login"><input id="password" name="password" type="password" required autofocus><label class="show"><input id="showPassword" type="checkbox">顯示密碼</label><button>進入後台</button></form>${message}<script>document.querySelector("#showPassword").onchange=e=>document.querySelector("#password").type=e.target.checked?"text":"password";</script></main></html>`;
+  return `<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Winnway Studio｜管理驗證</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f2e9dc;color:#251619;font:16px system-ui,"Microsoft JhengHei",sans-serif}.box{width:min(400px,88vw);background:#fffdfa;padding:38px;box-shadow:0 20px 60px #4b2b2730}.brand{font:700 25px Georgia,serif;letter-spacing:.1em}.brand small{display:block;color:#766963;font:11px Georgia,serif;letter-spacing:.18em;margin-top:6px}.field-label{display:block;margin:30px 0 8px}input,button{box-sizing:border-box;width:100%;padding:13px;font:inherit}input{border:1px solid #d8caba}.show{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:#685b54}.show input{width:auto;padding:0}button{margin-top:14px;border:0;background:#7c2d38;color:#fff}.error{color:#8b2f3a;font-size:13px}</style><main class="box"><div class="brand">WINNWAY STUDIO<small>CONTENT ADMIN</small></div><label class="field-label">管理後台密碼</label><form id="adminForm"><input id="password" name="password" type="password" required autofocus><label class="show"><input id="showPassword" type="checkbox">顯示密碼</label><button>進入後台</button></form><p id="error" class="error">${message}</p><script>document.querySelector("#showPassword").onchange=e=>document.querySelector("#password").type=e.target.checked?"text":"password";document.querySelector("#adminForm").onsubmit=async e=>{e.preventDefault();const r=await fetch("/api/admin/login",{method:"POST",body:new FormData(e.currentTarget),credentials:"same-origin"});const d=await r.json();if(!r.ok){document.querySelector("#error").textContent=d.error||"驗證失敗。";return}location.href="/admin"};</script></main></html>`;
 }
 
 async function requestBody(request) { try { return await request.json(); } catch { return {}; } }
@@ -155,27 +155,26 @@ export default {
     const signedIn = await hasSession(request, env);
     if (url.pathname === "/admin") {
       if (!signedIn) return Response.redirect(`${url.origin}/login`, 302);
+      if (!env.ADMIN_PASSWORD) return html(adminLoginPage("尚未設定管理後台密碼。"), 503);
+      if (!await hasAdminSession(request, env)) return html(adminLoginPage());
       return env.ASSETS.fetch(new Request(new URL("/admin.html", request.url), request));
     }
     if (url.pathname === "/api/admin/login" && request.method === "POST") {
-      if (!signedIn) return Response.redirect(`${url.origin}/login`, 302);
+      if (!signedIn) return json({ error: "請先登入網站。" }, 401);
       const form = await request.formData();
-      if (!env.ADMIN_PASSWORD) return html(adminLoginPage("<p class=error>尚未設定管理後台密碼。</p>"), 503);
-      if (String(form.get("password") || "") !== env.ADMIN_PASSWORD) return html(adminLoginPage("<p class=error>管理密碼不正確。</p>"), 401);
+      if (!env.ADMIN_PASSWORD) return json({ error: "尚未設定管理後台密碼。" }, 503);
+      if (String(form.get("password") || "") !== env.ADMIN_PASSWORD) return json({ error: "管理密碼不正確。" }, 401);
       const cookie = await newAdminSession(env);
-      const adminAsset = await env.ASSETS.fetch(new Request(new URL("/admin.html", request.url), request));
-      const page = (await adminAsset.text()).replace("</body>", "<script>history.replaceState(null, '', '/admin');</script></body>");
-      return html(page, 200, { "set-cookie": `winnway_admin=${cookie}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=43200` });
+      return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json; charset=UTF-8", "cache-control": "no-store", "set-cookie": `winnway_admin=${cookie}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200` } });
     }
     if (!signedIn) return Response.redirect(`${url.origin}/login`, 302);
-    if (url.pathname === "/admin/login") {
-      if (await hasAdminSession(request, env)) return Response.redirect(`${url.origin}/admin`, 302);
-      return html(adminLoginPage());
-    }
     try {
       if (url.pathname === "/winnway-content.json") return json(await managedContent(request, env));
       if (url.pathname.startsWith("/api/cellar")) return cellarApi(request, env, url.pathname);
-      if (url.pathname.startsWith("/api/content")) return contentApi(request, env, url.pathname);
+      if (url.pathname.startsWith("/api/content")) {
+        if (!await hasAdminSession(request, env)) return json({ error: "請先通過後台密碼驗證。" }, 403);
+        return contentApi(request, env, url.pathname);
+      }
       return env.ASSETS.fetch(request);
     } catch (error) { return json({ error: `系統暫時無法處理：${error.message}` }, 500); }
   },
