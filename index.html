@@ -23,6 +23,7 @@
     .sommelier-options{display:grid;gap:17px;margin:22px 0}.sommelier-options h3{font-size:12px;letter-spacing:.11em;color:var(--gold);margin:0 0 8px}.choice-set{display:flex;flex-wrap:wrap;gap:8px}.choice-set button{border:1px solid var(--line);background:#fff;color:var(--ink);padding:8px 11px;font-size:12px}.choice-set button.active{background:var(--wine);border-color:var(--wine);color:#fff}.budget-field{width:min(260px,100%);border:1px solid var(--line);padding:10px;background:#fff}.sommelier-note{margin-top:0!important}.sommelier-note textarea{margin-top:6px!important}
     .cellar-wine{grid-template-columns:60px 1fr auto auto}.cellar-total{font:700 17px Georgia,"Noto Serif TC",serif;color:var(--wine);white-space:nowrap}.ledger-form{display:grid;grid-template-columns:1.15fr .8fr .65fr 1.7fr auto;gap:8px;margin:17px 0 0 74px;padding:14px;background:var(--cream)}.ledger-form label{font-size:10px;color:var(--muted)}.ledger-form input,.ledger-form select{width:100%;margin-top:4px;padding:7px;border:1px solid #d8caba;background:#fff;font-size:12px}.ledger-form button{align-self:end;padding:8px 11px;font-size:12px}.ledger-history{margin:13px 0 0 74px}.ledger-history h4{font-size:11px;color:var(--gold);letter-spacing:.1em;margin:0 0 5px}.ledger-row{display:grid;grid-template-columns:92px 72px 1fr;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:12px}.ledger-in{color:#356444}.ledger-out{color:var(--wine)}.cellar-meta{margin:14px 0 0 74px;display:grid;grid-template-columns:1fr 1fr;gap:10px}.cellar-meta label{font-size:11px;color:var(--muted)}.cellar-meta input,.cellar-meta textarea{width:100%;border:1px solid var(--line);background:#fff;padding:8px;margin-top:4px}.cellar-meta textarea{min-height:58px;resize:vertical}.cellar-meta .note-field{grid-column:1/-1}@media(max-width:720px){.cellar-wine{grid-template-columns:52px 1fr auto}.cellar-wine .cellar-remove{grid-column:2/4;justify-self:start}.ledger-form{grid-template-columns:1fr 1fr;margin-left:0}.ledger-form label:nth-child(4){grid-column:1/-1}.ledger-form button{grid-column:1/-1}.ledger-history,.cellar-meta{margin-left:0}.ledger-row{grid-template-columns:86px 64px 1fr}}
   .wiki-subtitle{display:block;margin-top:20px;font:700 1.13em/1.35 "Noto Serif TC",serif;color:var(--wine);letter-spacing:.02em}.wiki-more{display:block;margin:18px 0 0 auto;border:0;background:transparent;color:var(--wine);font-weight:700;font-size:12px;padding:8px 0;border-bottom:1px solid currentColor}
+    .filters{display:grid;gap:10px;margin-bottom:26px}.filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.filter-label{min-width:42px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.08em}
   </style>
 </head>
 <body>
@@ -159,5 +160,32 @@
     }
     loadManagedContent();
   </script>
-<script src="cellar-sync.js"></script></body>
+  <script>
+    /* 酒類與國家固定上下兩排篩選；舊有酒款預設為葡萄酒。 */
+    let activeLiquorType='全部';
+    renderFilters=()=>{
+      const liquorTypes=['全部','葡萄酒','烈酒','其他'];
+      filters.innerHTML='<div class="filter-row"><span class="filter-label">酒類</span>'+liquorTypes.map(type=>'<button class="filter '+(type===activeLiquorType?'active':'')+'" data-liquor-type="'+esc(type)+'">'+esc(type)+'</button>').join('')+'</div><div class="filter-row"><span class="filter-label">國家</span>'+['全部',...countries].map(country=>'<button class="filter '+(country===activeCountry?'active':'')+'" data-country="'+esc(country)+'">'+esc(country)+'</button>').join('')+'</div>';
+      filters.querySelectorAll('[data-liquor-type]').forEach(button=>button.onclick=()=>{activeLiquorType=button.dataset.liquorType;renderFilters();renderWines()});
+      filters.querySelectorAll('[data-country]').forEach(button=>button.onclick=()=>{activeCountry=button.dataset.country;renderFilters();renderWines()});
+    };
+    renderWines=()=>{
+      const key=query.toLowerCase();
+      const list=wines.filter(wine=>{
+        const liquorType=wine.liquorType||'葡萄酒';
+        const hay=[wine.name,wine.englishName,wine.winery,wine.country,wine.region,wine.grape,liquorType].join(' ').toLowerCase();
+        return (activeCountry==='全部'||wine.country===activeCountry)&&(activeLiquorType==='全部'||liquorType===activeLiquorType)&&(!key||hay.includes(key));
+      });
+      grid.innerHTML=list.length?list.map(wine=>{
+        const image=wine.image?'<img src="'+esc(wine.image)+'" alt="'+esc(wine.name)+'">':'';
+        const grape=wine.grape?'<span class="tag">'+esc(wine.grape)+'</span>':'';
+        const price=wine.price?'<span class="tag">'+esc(wine.price)+'</span>':'';
+        const years=wine.hasVintage?'<span class="tag">多年份</span>':'';
+        return '<article class="wine-card"><div class="bottle-box">'+image+'</div><div class="wine-copy"><div class="wine-meta">'+esc([wine.liquorType||'葡萄酒',wine.country,wine.region].filter(Boolean).join(' · '))+'</div><h3>'+esc(wine.name||wine.englishName)+'</h3><p>'+esc(wine.englishName)+'</p><div class="tags">'+grape+price+years+'</div><button class="detail-btn" data-id="'+esc(wine.id)+'">查看酒款 →</button></div></article>';
+      }).join(''):'<div class="empty">找不到符合的酒款，請嘗試其他關鍵字。</div>';
+      grid.querySelectorAll('[data-id]').forEach(button=>button.onclick=()=>openWine(button.dataset.id));
+    };
+    renderFilters();renderWines();
+  </script>
+</body>
 </html>
