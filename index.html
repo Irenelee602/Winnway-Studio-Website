@@ -181,7 +181,8 @@
         const grape=wine.grape?'<span class="tag">'+esc(wine.grape)+'</span>':'';
         const price=wine.price?'<span class="tag">'+esc(wine.price)+'</span>':'';
         const years=wine.hasVintage?'<span class="tag">多年份</span>':'';
-        return '<article class="wine-card"><div class="bottle-box">'+image+'</div><div class="wine-copy"><div class="wine-meta">'+esc([wine.liquorType||'葡萄酒',wine.country,wine.region].filter(Boolean).join(' · '))+'</div><h3>'+esc(wine.name||wine.englishName)+'</h3><p>'+esc(wine.englishName)+'</p><div class="tags">'+grape+price+years+'</div><button class="detail-btn" data-id="'+esc(wine.id)+'">查看酒款 →</button></div></article>';
+        const englishName=wine.englishName?'<p>'+esc(wine.englishName)+'</p>':'';
+        return '<article class="wine-card"><div class="bottle-box">'+image+'</div><div class="wine-copy"><div class="wine-meta">'+esc([wine.liquorType||'葡萄酒',wine.country,wine.region].filter(Boolean).join(' · '))+'</div><h3>'+esc(wine.name||wine.englishName)+'</h3>'+englishName+'<div class="tags">'+grape+price+years+'</div><button class="detail-btn" data-id="'+esc(wine.id)+'">查看酒款 →</button></div></article>';
       }).join(''):'<div class="empty">找不到符合的酒款，請嘗試其他關鍵字。</div>';
       grid.querySelectorAll('[data-id]').forEach(button=>button.onclick=()=>openWine(button.dataset.id));
     };
@@ -194,6 +195,11 @@
       originalOpenWineWithLiquorDetails(id);
       const wine=wines.find(item=>item.id===id);
       if(!wine)return;
+      const visibleInfo={葡萄品種:wine.grape,香氣描述:wine.aroma,建議搭餐:wine.pairing,酒款故事:wine.story};
+      document.querySelectorAll('#modal .info').forEach(info=>{const heading=info.querySelector('h4')?.textContent;if(heading in visibleInfo&&!visibleInfo[heading])info.remove();});
+      const hasVintage=wine.hasVintage&&(vintagesByWine[id]||[]).length>0;
+      if(!wine.price&&!hasVintage)document.querySelector('#modal .price-box')?.remove();
+      if(!wine.englishName&&!wine.winery)document.querySelector('#modal .sub')?.remove();
       const details=[];
       if(wine.spiritCategory)details.push('<div class="info"><h4>酒類細分類</h4><p>'+esc(wine.spiritCategory)+'</p></div>');
       if(wine.alcoholContent)details.push('<div class="info"><h4>酒精濃度</h4><p>'+esc(wine.alcoholContent)+'</p></div>');
