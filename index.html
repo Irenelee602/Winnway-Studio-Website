@@ -257,5 +257,54 @@
     };
     renderWines();
   </script>
+  <script>
+    /* 共用酒窖：資料改由 Cloudflare D1 儲存，所有登入裝置讀取同一份庫存。 */
+    const cellarApi=async(path,body)=>{
+      const response=await fetch(path,{method:body?'POST':'GET',credentials:'include',headers:body?{'content-type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
+      const data=await response.json();
+      if(!response.ok)throw Error(data.error||'酒窖暫時無法同步，請稍後再試。');
+      return data;
+    };
+    const sharedEntriesFor=(data,wineId)=>data.entries.filter(entry=>entry.wine_id===wineId);
+    const sharedStockOf=entries=>entries.reduce((total,entry)=>total+(entry.entry_type==='out'?-Number(entry.quantity||0):Number(entry.quantity||0)),0);
+    const sharedCellarLoad=()=>cellarApi('/api/cellar');
+    const importOldLocalCellar=async data=>{
+      if(data.items.length||!Array.isArray(cellar)||!cellar.length)return data;
+      /* 僅在共用酒窖第一次尚無任何資料時，匯入這台裝置原有的本機紀錄。 */
+      for(const wineId of cellar){
+        const old=getCellarRecord(wineId);
+        await cellarApi('/api/cellar/add',{wineId});
+        await cellarApi('/api/cellar/meta',{wineId,location:old.location||'',note:old.note||''});
+        for(const entry of old.ledger||[])await cellarApi('/api/cellar/entry',{wineId,date:entry.date||today(),type:entry.type==='out'?'out':'in',quantity:Math.max(1,Number(entry.quantity)||1),reason:entry.reason||'由舊酒窖匯入',personName:'舊資料匯入'});
+      }
+      return sharedCellarLoad();
+    };
+    addCellar=async wineId=>{
+      try{await cellarApi('/api/cellar/add',{wineId});await openCellar();}
+      catch(error){alert('加入共用酒窖失敗：'+error.message);}
+    };
+    openCellar=async()=>{
+      const wrap=document.querySelector('#modalWrap');
+      document.querySelector('#modal').innerHTML='<button class="close" aria-label="關閉">×</button><div class="cellar"><div class="eyebrow">Shared cellar</div><h2>我的酒窖</h2><p class="sub">正在讀取所有裝置共用的庫存紀錄…</p></div>';
+      wrap.classList.add('open');wrap.setAttribute('aria-hidden','false');document.querySelector('.close').onclick=closeModal;
+      try{
+        let data=await sharedCellarLoad();data=await importOldLocalCellar(data);
+        const cellarBox=document.querySelector('#modal .cellar');
+        const rows=data.items.map(item=>({item,wine:wines.find(wine=>wine.id===item.wine_id)})).filter(row=>row.wine);
+        const cell=row=>{
+          const w=row.wine,item=row.item,entries=sharedEntriesFor(data,w.id),stock=sharedStockOf(entries);
+          const history=[...entries].sort((a,b)=>String(b.entry_date).localeCompare(String(a.entry_date))||Number(b.id)-Number(a.id)).map(entry=>'<div class="ledger-row"><span>'+esc(entry.entry_date||'日期未記錄')+'</span><b class="ledger-'+esc(entry.entry_type)+'">'+(entry.entry_type==='out'?'取出 −':'入庫 +')+esc(entry.quantity)+' 瓶</b><span>'+esc([entry.reason,entry.person_name].filter(Boolean).join('｜')||'未填寫原因')+'</span></div>').join('')||'<p class="sub">尚未新增進出紀錄。</p>';
+          return '<div class="cellar-item" data-cellar-id="'+esc(w.id)+'"><div class="cellar-wine">'+(w.image?'<img src="'+esc(w.image)+'" alt="">':'')+'<div><b>'+esc(w.name||w.englishName)+'</b><br><small>'+esc(w.englishName||w.winery||'')+'</small></div><strong class="cellar-total">現有 '+stock+' 瓶</strong><button class="cellar-remove" data-remove="'+esc(w.id)+'">移除</button></div><div class="ledger-form"><label>日期<input data-ledger="date" type="date" value="'+today()+'"></label><label>類型<select data-ledger="type"><option value="in">入庫</option><option value="out">取出</option></select></label><label>數量（瓶）<input data-ledger="quantity" type="number" min="1" value="1"></label><label>原因／用途<input data-ledger="reason" placeholder="例如：購入、聚餐飲用"></label><label>登記人<input data-ledger="personName" placeholder="例如：Irene"></label><button class="primary" data-add-ledger="'+esc(w.id)+'">新增紀錄</button></div><div class="ledger-history"><h4>進出紀錄</h4>'+history+'</div><div class="cellar-meta"><label>存放地<input data-meta="location" value="'+esc(item.location||'')+'" placeholder="例如：酒櫃上層"></label><label class="note-field">備註<textarea data-meta="note" placeholder="例如：適合 2028 年後飲用">'+esc(item.note||'')+'</textarea></label><button class="primary cellar-save" data-save-meta="'+esc(w.id)+'">儲存酒款資訊</button><span class="cellar-status" data-status="'+esc(w.id)+'"></span></div></div>';
+        };
+        cellarBox.innerHTML='<div class="eyebrow">Shared cellar</div><h2>我的酒窖</h2><p class="sub">此酒窖由所有登入裝置共用；新增、取出、存放地與備註會同步更新。</p><input id="cellarSearch" class="cellar-search" type="search" placeholder="搜尋酒名、酒莊、產區、存放地或備註"><div id="cellarSearchEmpty" class="cellar-search-empty" hidden>找不到符合的酒窖紀錄。</div>'+(rows.length?rows.map(cell).join(''):'<div class="empty">酒窖目前是空的。從酒款詳細頁加入第一支酒吧。</div>');
+        document.querySelectorAll('[data-remove]').forEach(button=>button.onclick=async()=>{if(!confirm('確定從共用酒窖移除此酒與所有進出紀錄？'))return;try{await cellarApi('/api/cellar/remove',{wineId:button.dataset.remove});await openCellar();}catch(error){alert(error.message);}});
+        document.querySelectorAll('[data-add-ledger]').forEach(button=>button.onclick=async()=>{const item=button.closest('[data-cellar-id]'),values={};item.querySelectorAll('[data-ledger]').forEach(input=>values[input.dataset.ledger]=input.value.trim());try{await cellarApi('/api/cellar/entry',{wineId:button.dataset.addLedger,date:values.date||today(),type:values.type,quantity:values.quantity,reason:values.reason,personName:values.personName||'未填寫'});await openCellar();}catch(error){const status=item.querySelector('[data-status]');status.textContent=error.message;}});
+        document.querySelectorAll('[data-save-meta]').forEach(button=>button.onclick=async()=>{const item=button.closest('[data-cellar-id]'),values={};item.querySelectorAll('[data-meta]').forEach(input=>values[input.dataset.meta]=input.value.trim());try{await cellarApi('/api/cellar/meta',{wineId:button.dataset.saveMeta,location:values.location,note:values.note});const status=item.querySelector('[data-status]');status.textContent='已同步儲存';setTimeout(()=>status.textContent='',1800);}catch(error){item.querySelector('[data-status]').textContent=error.message;}});
+        const search=document.querySelector('#cellarSearch'),empty=document.querySelector('#cellarSearchEmpty');
+        search.oninput=()=>{const keyword=search.value.trim().toLowerCase();let visible=0;cellarBox.querySelectorAll('[data-cellar-id]').forEach(row=>{const wine=wines.find(item=>item.id===row.dataset.cellarId)||{};const item=data.items.find(x=>x.wine_id===row.dataset.cellarId)||{};const hay=[wine.name,wine.englishName,wine.winery,wine.country,wine.region,item.location,item.note].join(' ').toLowerCase();const matched=!keyword||hay.includes(keyword);row.hidden=!matched;if(matched)visible++;});empty.hidden=visible>0;};
+      }catch(error){document.querySelector('#modal .cellar').innerHTML='<div class="eyebrow">Shared cellar</div><h2>我的酒窖</h2><p class="sub">酒窖暫時無法讀取：'+esc(error.message)+'</p><button class="primary" id="retryCellar">重新讀取</button>';document.querySelector('#retryCellar').onclick=openCellar;}
+    };
+    document.querySelector('#openCellar').onclick=openCellar;
+  </script>
 </body>
 </html>
