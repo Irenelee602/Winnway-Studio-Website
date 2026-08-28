@@ -24,6 +24,9 @@
     .cellar-wine{grid-template-columns:60px 1fr auto auto}.cellar-total{font:700 17px Georgia,"Noto Serif TC",serif;color:var(--wine);white-space:nowrap}.ledger-form{display:grid;grid-template-columns:1.15fr .8fr .65fr 1.7fr auto;gap:8px;margin:17px 0 0 74px;padding:14px;background:var(--cream)}.ledger-form label{font-size:10px;color:var(--muted)}.ledger-form input,.ledger-form select{width:100%;margin-top:4px;padding:7px;border:1px solid #d8caba;background:#fff;font-size:12px}.ledger-form button{align-self:end;padding:8px 11px;font-size:12px}.ledger-history{margin:13px 0 0 74px}.ledger-history h4{font-size:11px;color:var(--gold);letter-spacing:.1em;margin:0 0 5px}.ledger-row{display:grid;grid-template-columns:92px 72px 1fr;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:12px}.ledger-in{color:#356444}.ledger-out{color:var(--wine)}.cellar-meta{margin:14px 0 0 74px;display:grid;grid-template-columns:1fr 1fr;gap:10px}.cellar-meta label{font-size:11px;color:var(--muted)}.cellar-meta input,.cellar-meta textarea{width:100%;border:1px solid var(--line);background:#fff;padding:8px;margin-top:4px}.cellar-meta textarea{min-height:58px;resize:vertical}.cellar-meta .note-field{grid-column:1/-1}@media(max-width:720px){.cellar-wine{grid-template-columns:52px 1fr auto}.cellar-wine .cellar-remove{grid-column:2/4;justify-self:start}.ledger-form{grid-template-columns:1fr 1fr;margin-left:0}.ledger-form label:nth-child(4){grid-column:1/-1}.ledger-form button{grid-column:1/-1}.ledger-history,.cellar-meta{margin-left:0}.ledger-row{grid-template-columns:86px 64px 1fr}}
   .wiki-subtitle{display:block;margin-top:20px;font:700 1.13em/1.35 "Noto Serif TC",serif;color:var(--wine);letter-spacing:.02em}.wiki-more{display:block;margin:18px 0 0 auto;border:0;background:transparent;color:var(--wine);font-weight:700;font-size:12px;padding:8px 0;border-bottom:1px solid currentColor}
     .filters{display:grid;gap:10px;margin-bottom:26px}.filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.filter-label{min-width:42px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.08em}
+    /* 酒款卡片與詳細頁重點資訊字級加大。 */
+    .wine-meta{font-size:13px}.tag{font-size:13px}.modal-copy .eyebrow{font-size:14px}.modal-copy .sub{font-size:16px}.modal-copy .info p{font-size:16px}@media(max-width:720px){.wine-meta,.tag{font-size:13px}.modal-copy .eyebrow{font-size:14px}.modal-copy .sub,.modal-copy .info p{font-size:15px}}
+    .cellar-search{width:100%;margin:14px 0 4px;padding:11px 13px;border:1px solid var(--line);background:#fff}.cellar-search-empty{padding:24px 0;color:var(--muted)}
   </style>
 </head>
 <body>
@@ -205,6 +208,54 @@
       if(wine.alcoholContent)details.push('<div class="info"><h4>酒精濃度</h4><p>'+esc(wine.alcoholContent)+'</p></div>');
       if(details.length){const anchor=document.querySelector('#modal .price-box');if(anchor)anchor.insertAdjacentHTML('afterend',details.join(''));}
     };
+  </script>
+  <script>
+    /* 收藏排序僅用於整理卡片；不會在網站上顯示細分類標題。 */
+    const wineCardCollator=new Intl.Collator('zh-Hant',{numeric:true,sensitivity:'base'});
+    const wineTypeRank={葡萄酒:0,烈酒:1,其他:2};
+    const sortWineCollection=(a,b)=>{
+      const aType=a.liquorType||'葡萄酒',bType=b.liquorType||'葡萄酒';
+      let result=(wineTypeRank[aType]??99)-(wineTypeRank[bType]??99);
+      if(!result)result=wineCardCollator.compare(a.spiritCategory||'未分類',b.spiritCategory||'未分類');
+      if(!result)result=wineCardCollator.compare(a.winery||a.name||a.englishName||'',b.winery||b.name||b.englishName||'');
+      return result||wineCardCollator.compare(a.name||a.englishName||'',b.name||b.englishName||'');
+    };
+    const renderWinesBeforeCollectionSort=renderWines;
+    renderWines=()=>{wines.sort(sortWineCollection);renderWinesBeforeCollectionSort();};
+
+    /* 多年份價格於詳細頁固定由新到舊排列。 */
+    const openWineBeforeCollectionExtras=openWine;
+    openWine=id=>{
+      const vintages=vintagesByWine[id];
+      if(Array.isArray(vintages))vintages.sort((a,b)=>Number(b.year)-Number(a.year)||wineCardCollator.compare(String(b.year),String(a.year)));
+      openWineBeforeCollectionExtras(id);
+      const wine=wines.find(item=>item.id===id);
+      if(!wine||wine.registeredQuantity===null||wine.registeredQuantity===undefined||wine.registeredQuantity==='')return;
+      const anchor=document.querySelector('#modal #addCellar');
+      if(anchor)anchor.insertAdjacentHTML('beforebegin','<div class="info"><h4>團隊登記數量</h4><p>'+esc(String(wine.registeredQuantity))+' 瓶</p></div>');
+    };
+
+    /* 我的酒窖可依酒名、酒莊、產區、存放地與備註搜尋。 */
+    const openCellarBeforeSearch=openCellar;
+    openCellar=()=>{
+      openCellarBeforeSearch();
+      const cellar=document.querySelector('#modal .cellar');
+      const intro=cellar?.querySelector('.sub');
+      if(!cellar||!intro)return;
+      intro.insertAdjacentHTML('afterend','<input id="cellarSearch" class="cellar-search" type="search" placeholder="搜尋酒名、酒莊、產區、存放地或備註"><div id="cellarSearchEmpty" class="cellar-search-empty" hidden>找不到符合的酒窖紀錄。</div>');
+      const search=document.querySelector('#cellarSearch'),empty=document.querySelector('#cellarSearchEmpty');
+      search.oninput=()=>{
+        const keyword=search.value.trim().toLowerCase();let visible=0;
+        cellar.querySelectorAll('[data-cellar-id]').forEach(row=>{
+          const wine=wines.find(item=>item.id===row.dataset.cellarId)||{};
+          const record=typeof getCellarRecord==='function'?getCellarRecord(row.dataset.cellarId):{};
+          const hay=[wine.name,wine.englishName,wine.winery,wine.country,wine.region,record.location,record.note].join(' ').toLowerCase();
+          const matched=!keyword||hay.includes(keyword);row.hidden=!matched;if(matched)visible++;
+        });
+        empty.hidden=visible>0;
+      };
+    };
+    renderWines();
   </script>
 </body>
 </html>
