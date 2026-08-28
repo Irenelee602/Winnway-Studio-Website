@@ -230,9 +230,7 @@
       if(Array.isArray(vintages))vintages.sort((a,b)=>Number(b.year)-Number(a.year)||wineCardCollator.compare(String(b.year),String(a.year)));
       openWineBeforeCollectionExtras(id);
       const wine=wines.find(item=>item.id===id);
-      if(!wine||wine.registeredQuantity===null||wine.registeredQuantity===undefined||wine.registeredQuantity==='')return;
-      const anchor=document.querySelector('#modal #addCellar');
-      if(anchor)anchor.insertAdjacentHTML('beforebegin','<div class="info"><h4>團隊登記數量</h4><p>'+esc(String(wine.registeredQuantity))+' 瓶</p></div>');
+      /* 庫存以「我的酒窖」的共用進出紀錄為準，不顯示舊版靜態登記數量。 */
     };
 
     /* 我的酒窖可依酒名、酒莊、產區、存放地與備註搜尋。 */
