@@ -31,7 +31,7 @@
 </head>
 <body>
   <nav class="nav"><a class="brand" href="#top">WINNWAY STUDIO<small>THE ART OF DISCOVERY</small></a><button class="menu-toggle" id="menuToggle" aria-expanded="false" aria-controls="navLinks">選單</button><div class="nav-links" id="navLinks"><a href="#wines">酒款收藏</a><a href="#compare">酒款比較</a><a href="#wiki">紅酒百科</a><button class="nav-action" id="openSommelier">問侍酒師</button><button class="nav-action" id="openCellar">我的酒窖</button><a href="/api/logout">登出</a></div></nav>
-  <main id="top"><header class="hero"><div><div class="eyebrow">Wine, made clear</div><h1><span class="desktop-hero">從第一口開始，<em>讀懂</em><br>一支酒。</span><span class="mobile-hero">從第一口開始<br><em>讀懂</em>一支酒。</span></h1><p>以產區、品種與風味，帶你找到每一支酒的故事。</p><form class="search" id="searchForm"><input id="searchInput" aria-label="搜尋酒款" placeholder="搜尋酒名、酒莊、產區或葡萄品種"><button>搜尋</button></form></div></header>
+  <main id="top"><header class="hero"><div><div class="eyebrow">Wine, made clear</div><h1><span class="desktop-hero">從第一口開始，<em>讀懂</em><br>一支酒。</span><span class="mobile-hero">從第一口開始<br><em>讀懂</em>一支酒。</span></h1><p>以產區、品種與風味，帶你找到每一支酒的故事。</p><form class="search" id="searchForm"><input id="searchInput" list="wineSearchTerms" aria-label="搜尋酒款" placeholder="搜尋酒名、酒莊、產區或葡萄品種"><datalist id="wineSearchTerms"></datalist><button>搜尋</button></form></div></header>
   <section id="wines"><div class="section-head"><div><div class="eyebrow">Curated selection</div><h2>酒款收藏</h2></div><p>每支酒都可以展開閱讀香氣、搭餐與年份價格。未提供年份資料的酒款，直接顯示參考價格。</p></div><div class="filters" id="filters"></div><div class="wine-grid" id="wineGrid"></div></section>
   <section class="compare" id="compare"><div class="section-head"><div><div class="eyebrow">Side by side</div><h2>酒款比較</h2></div><p>選擇兩支酒，快速比較產區、品種、價格與風味。</p></div><div class="compare-grid"><select id="compareA"></select><select id="compareB"></select></div><div class="comparison" id="comparison"></div></section>
   <section class="wiki" id="wiki"><div class="section-head"><div><div class="eyebrow">Wine knowledge</div><h2>紅酒百科</h2></div></div><div class="wiki-groups" id="wikiGroups"></div></section></main>
@@ -149,6 +149,7 @@
     menuToggle.onclick=()=>{const isOpen=navLinks.classList.toggle('open');menuToggle.setAttribute('aria-expanded',String(isOpen));menuToggle.textContent=isOpen?'收起':'選單'};
     navLinks.querySelectorAll('a,button').forEach(item=>item.addEventListener('click',()=>{navLinks.classList.remove('open');menuToggle.setAttribute('aria-expanded','false');menuToggle.textContent='選單'}));
     document.querySelector('#openCellar').onclick=openCellar;document.querySelector('#openSommelier').onclick=openSommelier;
+    function updateSearchSuggestions(){const terms=[...new Set(wines.flatMap(wine=>[wine.name,wine.englishName,wine.winery,wine.country,wine.region,wine.grape,wine.liquorType,wine.spiritCategory]).map(value=>String(value||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));document.querySelector('#wineSearchTerms').innerHTML=terms.map(term=>'<option value="'+esc(term)+'"></option>').join('')}
     async function loadManagedContent(){
       try{
         const response=await fetch('winnway-content.json',{cache:'no-store'});
@@ -159,7 +160,7 @@
         if(content.vintagesByWine&&typeof content.vintagesByWine==='object'){Object.keys(vintagesByWine).forEach(key=>delete vintagesByWine[key]);Object.assign(vintagesByWine,content.vintagesByWine)}
         countries=[...new Set(wines.map(wine=>wine.country).filter(Boolean))];
       }catch(error){}
-      renderFilters();renderWines();setupCompare();renderWiki();
+      updateSearchSuggestions();renderFilters();renderWines();setupCompare();renderWiki();
     }
     loadManagedContent();
   </script>
@@ -174,11 +175,12 @@
     };
     renderWines=()=>{
       const key=query.toLowerCase();
-      const list=wines.filter(wine=>{
-        const liquorType=wine.liquorType||'葡萄酒';
-        const hay=[wine.name,wine.englishName,wine.winery,wine.country,wine.region,wine.grape,liquorType].join(' ').toLowerCase();
-        return (activeCountry==='全部'||wine.country===activeCountry)&&(activeLiquorType==='全部'||liquorType===activeLiquorType)&&(!key||hay.includes(key));
-      });
+      const withinFilters=wine=>{const liquorType=wine.liquorType||'葡萄酒';return (activeCountry==='全部'||wine.country===activeCountry)&&(activeLiquorType==='全部'||liquorType===activeLiquorType)};
+      const filtered=wines.filter(withinFilters);
+      /* 優先找酒名、英文名與酒莊；沒有任何命中時才擴大到國家、產區與品種。 */
+      const byMainIdentity=wine=>[wine.name,wine.englishName,wine.winery].join(' ').toLowerCase().includes(key);
+      const byExtraDetails=wine=>[wine.country,wine.region,wine.grape,wine.liquorType||'葡萄酒',wine.spiritCategory].join(' ').toLowerCase().includes(key);
+      const list=!key?filtered:(filtered.filter(byMainIdentity).length?filtered.filter(byMainIdentity):filtered.filter(byExtraDetails));
       grid.innerHTML=list.length?list.map(wine=>{
         const image=wine.image?'<img src="'+esc(wine.image)+'" alt="'+esc(wine.name)+'">':'';
         const grape=wine.grape?'<span class="tag">'+esc(wine.grape)+'</span>':'';
